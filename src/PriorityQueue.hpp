@@ -31,7 +31,7 @@ public:
 		return min;
 	}
 
-	void Insert(int key) {
+	void Insert(T key) {
 		if (size_ >= capacity_) Resize(capacity_ + 10);
 		++size_;
 		data_[size_ - 1] = key;
