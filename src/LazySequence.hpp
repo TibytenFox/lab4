@@ -88,7 +88,7 @@ public:
                 new_cache->Append(cache_->Get(i));
             }
             new_cache->Append(item);
-            return new LazySequence<T>(new_cache);
+            return new LazySequence<T>(nullptr, new_cache, Cardinal::finite(new_cache->GetLength()));
 		}
         Cardinal new_length = length_.IsInfinite() ? Cardinal::infinite() : Cardinal::finite(length_.value + 1);
         return new LazySequence<T>(generator_->Append(item), new_length);
@@ -104,7 +104,7 @@ public:
             for (size_t i = 0; i < items->GetLength(); ++i) {
                 new_cache->Append(items->Get(i));
             }
-            return new LazySequence<T>(new_cache);
+            return new LazySequence<T>(nullptr, new_cache, Cardinal::finite(new_cache->GetLength()));
 		}
         Cardinal new_length = length_.IsInfinite() ? Cardinal::infinite() : Cardinal::finite(length_.value + items->GetLength());
         return new LazySequence<T>(generator_->Append(items), new_length);
@@ -120,7 +120,7 @@ public:
                 new_cache->Append(cache_->Get(i));
             }
             new_cache->InsertAt(item, index); 
-            return new LazySequence<T>(new_cache);
+            return new LazySequence<T>(nullptr, new_cache, Cardinal::finite(new_cache->GetLength()));
 		}
         
         Cardinal new_length = length_.IsInfinite() ? Cardinal::infinite() : Cardinal::finite(length_.value + 1);
@@ -139,7 +139,7 @@ public:
             for (size_t i = 0; i < items->GetLength(); ++i) {
                 new_cache->InsertAt(items->Get(i), index + i);
             }
-            return new LazySequence<T>(new_cache);
+            return new LazySequence<T>(nullptr, new_cache, Cardinal::finite(new_cache->GetLength()));
 		}
         Cardinal new_length = length_.IsInfinite() ? Cardinal::infinite() : Cardinal::finite(length_.value + items->GetLength());
         return new LazySequence<T>(generator_->Insert(items, index), new_length);
@@ -162,7 +162,7 @@ public:
 			for (size_t i = index + count; i < cache_->GetLength(); ++i) {
 				new_cache->Append(cache_->Get(i));
 			}
-            return new LazySequence<T>(new_cache);
+            return new LazySequence<T>(nullptr, new_cache, Cardinal::finite(new_cache->GetLength()));
 		}
         if (length_.IsFinite()) {
             if (index + count > length_.value) throw IndexOutOfRange();
@@ -224,6 +224,18 @@ public:
             new_length = Cardinal::finite(min_length);
         }
         return new LazySequence<Pair<T, T2>>(new ZipGenerator<T, T2>(first, second), new_length);
+    }
+
+    LazySequence<T>* Concat(const LazySequence<T>* other) const {
+        Generator<T>* first_gen = generator_ ? generator_->Clone() : new SequenceGenerator<T>(cache_);
+        Generator<T>* second_gen = other->generator_ ? other->generator_->Clone() : new SequenceGenerator<T>(other->cache_);
+
+        Cardinal new_length = Cardinal::infinite();
+        if (length_.IsFinite() && other->length_.IsFinite()) {
+            new_length = Cardinal::finite(length_.value + other->length_.value);
+        }
+
+        return new LazySequence<T>(new ConcatGenerator<T>(first_gen, second_gen), new_length);
     }
 
 private:

@@ -331,6 +331,7 @@ template <class T, class T2>
 class MapGenerator : public Generator<T2> {
 public:
 	MapGenerator(Generator<T>* base, T2 (*func)(T)) : base_(base->Clone()), func_(func) {}
+	~MapGenerator() override { delete base_; }
 	Generator<T2>* Clone() const override { return new MapGenerator<T, T2>(base_, func_); }
 	T2 GetNext() override { return func_(base_->GetNext()); }
 	bool HasNext() const override { return base_->HasNext(); }
@@ -387,7 +388,7 @@ template <class T, class T2>
 class ZipGenerator : public Generator<Pair<T, T2>> {
 public:
 	ZipGenerator(Generator<T>* first, Generator<T>* second) : first_(first), second_(second) {}
-	~ZipGenerator() { delete first_; delete second_; }
+	~ZipGenerator() override { delete first_; delete second_; }
 	ZipGenerator<T, T2>* Clone() const override { return new ZipGenerator<T, T2>(first_, second_); }
 	Pair<T, T2> GetNext() override { return Pair<T, T2>(first_->GetNext(), second_->GetNext()); }
 	bool HasNext() const override { return first_->HasNext() && second_->HasNext(); }
@@ -408,4 +409,54 @@ public:
 private:
 	Generator<T>* first_;
 	Generator<T>* second_;
+};
+
+template <class T>
+class ConcatGenerator : public Generator<T> {
+public:
+    ConcatGenerator(Generator<T>* first, Generator<T>* second) 
+        : first_(first), second_(second), first_exhausted_(false) {}
+
+    ~ConcatGenerator() override {
+        delete first_;
+        delete second_;
+    }
+
+    Generator<T>* Clone() const override {
+        ConcatGenerator<T>* cloned = new ConcatGenerator<T>(first_->Clone(), second_->Clone());
+        cloned->first_exhausted_ = this->first_exhausted_;
+        return cloned;
+    }
+
+    T GetNext() override {
+        if (!first_exhausted_ && first_->HasNext()) {
+            return first_->GetNext();
+        }
+        first_exhausted_ = true;
+        return second_->GetNext();
+    }
+
+    bool HasNext() const override {
+        if (!first_exhausted_ && first_->HasNext()) {
+            return true;
+        }
+        return second_->HasNext();
+    }
+
+    size_t GetMaterializedCount() const override {
+        return first_->GetMaterializedCount() + second_->GetMaterializedCount();
+    }
+
+	Generator<T>* Append(const T& item) const override { return new AppendGenerator<T>(this->Clone(), item); }
+    Generator<T>* Append(const Sequence<T>* items) const override { return new AppendGenerator<T>(this->Clone(), items); }
+    Generator<T>* Insert(const T& item, size_t index) const override { return new InsertGenerator<T>(this->Clone(), item, index); }
+    Generator<T>* Insert(const Sequence<T>* items, size_t index) const override { return new InsertGenerator<T>(this->Clone(), items, index); }
+    Generator<T>* Remove(size_t index) const override { return new RemoveGenerator<T>(this->Clone(), index); }
+    Generator<T>* Remove(size_t index, size_t count) const override { return new RemoveGenerator<T>(this->Clone(), index, count); }
+    Generator<T>* Where(bool (*predicate)(T)) const override { return new WhereGenerator<T>(this->Clone(), predicate); }
+
+private:
+    Generator<T>* first_;
+    Generator<T>* second_;
+    bool first_exhausted_;
 };
